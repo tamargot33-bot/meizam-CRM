@@ -9,3 +9,7 @@ desktop.ini
 .vscode/
 .idea/
 *.log
+*.bak
+backup/
+
+

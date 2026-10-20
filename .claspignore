@@ -1,0 +1,7 @@
+# קבצים שלא יידחפו ל-Google Apps Script בעת clasp push
+backup/**
+*.bak
+*.example.*
+.git/**
+.gitignore
+.clasp.json
