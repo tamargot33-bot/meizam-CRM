@@ -1,0 +1,11 @@
+# קבצי הגדרות וסודות - לא להעלות ל-GitHub
+Config.js
+.clasp.json
+
+# קבצי עריכה ומערכת הפעלה
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.log

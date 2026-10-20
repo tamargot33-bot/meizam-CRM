@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mizam CRM</title>
+  <style>
+    :root {
+      --dark:    #121b22;
+      --sidebar: #ffffff;
+      --chat-bg: #eae6df;
+      --green:   #00a884;
+      --border:  #e9edef;
+      --text-secondary: #667781;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; height: 100vh; display: flex; background: var(--chat-bg); overflow: hidden; }
+
+    /* Login */
+    #loginOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    #loginBox { background: white; border-radius: 12px; padding: 36px 40px; min-width: 300px; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+    #loginBox h2 { margin-bottom: 8px; color: var(--dark); }
+    #loginBox p  { color: var(--text-secondary); font-size: 13px; margin-bottom: 24px; }
+    #managerSelect { width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 15px; margin-bottom: 16px; direction: rtl; }
+    #loginBtn { width: 100%; padding: 11px; background: var(--green); color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; }
+    #loginBtn:hover { background: #008f72; }
+
+    /* Modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 200; }
+    .modal-box { background: white; border-radius: 12px; padding: 28px; width: 460px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+    .modal-box h3 { margin-bottom: 18px; color: var(--dark); font-size: 16px; }
+    .modal-field { margin-bottom: 14px; }
+    .modal-field label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 5px; }
+    .modal-field input, .modal-field textarea { width: 100%; padding: 9px 13px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 14px; font-family: inherit; outline: none; }
+    .modal-field input:focus, .modal-field textarea:focus { border-color: var(--green); }
+    .modal-field textarea { min-height: 100px; resize: vertical; }
+    .autocomplete-list { border: 1px solid var(--border); border-radius: 6px; max-height: 140px; overflow-y: auto; display: none; }
+    .autocomplete-item { padding: 8px 12px; cursor: pointer; font-size: 13px; }
+    .autocomplete-item:hover { background: #f5f5f5; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+    .modal-actions button { padding: 9px 20px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: bold; }
+    .btn-cancel { background: #f0f2f5; color: #444; }
+    .btn-send   { background: var(--green); color: white; }
+
+    /* Sidebar — 280px */
+    .sidebar { width: 400px; min-width: 400px; background: var(--sidebar); border-left: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+    .sidebar-header { background: var(--dark); padding: 14px 16px; color: white; display: flex; align-items: center; justify-content: space-between; }
+    .sidebar-header h2 { font-size: 15px; }
+    .sidebar-meta { font-size: 11px; color: #aaa; margin-top: 2px; }
+    .sidebar-header-btns { display: flex; gap: 6px; align-items: center; }
+    .hdr-btn { background: none; border: 1px solid #fff3; color: white; border-radius: 8px; padding: 4px 8px; cursor: pointer; font-size: 12px; }
+    .hdr-btn:hover { background: rgba(255,255,255,0.1); }
+
+    .search-bar { padding: 8px 10px; border-bottom: 1px solid var(--border); background: #f0f2f5; }
+    .search-bar input { width: 100%; padding: 6px 10px; border-radius: 20px; border: none; background: white; font-size: 13px; outline: none; }
+
+    .chat-list { flex: 1; overflow-y: auto; }
+    .chat-item { padding: 10px 12px; border-bottom: 1px solid #f0f2f5; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.1s; position: relative; }
+    .chat-item:hover { background: #f5f6f6; }
+    .chat-item.active { background: #f0f2f5; }
+    .chat-item.unread { font-weight: 600; }
+    .avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; color: white; flex-shrink: 0; }
+    .chat-item-info { flex: 1; min-width: 0; }
+    .chat-item-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chat-item-preview { font-size: 11px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+    .chat-item-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+    .chat-item-time { font-size: 10px; color: var(--text-secondary); }
+    .unread-badge { background: var(--green); color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 10px; display: flex; align-items: center; justify-content: center; }
+    .label-chip { font-size: 9px; padding: 2px 6px; border-radius: 10px; color: white; display: inline-block; }
+
+    /* כפתורי ריחוף על שרשור */
+    .chat-item-actions { display: none; position: absolute; left: 8px; top: 50%; transform: translateY(-50%); gap: 4px; }
+    .chat-item:hover .chat-item-actions { display: flex; }
+    .action-btn { width: 26px; height: 26px; border-radius: 50%; background: white; border: 1px solid var(--border); cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .action-btn:hover { background: #f0f2f5; }
+
+    /* Main */
+    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .chat-header { background: #f0f2f5; padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+    .header-info { flex: 1; }
+    .header-name { font-size: 16px; font-weight: 600; }
+    .header-sub  { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+    .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .icon-btn { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 13px; color: #444; white-space: nowrap; }
+    .icon-btn:hover { background: white; }
+
+    #displaySubject { cursor: pointer; border-bottom: 1px dashed transparent; display: inline; }
+    #displaySubject:hover { border-bottom-color: #aaa; }
+
+    /* Thread label dropdown */
+    .thread-label-wrap { position: relative; display: inline-block; }
+    .thread-label-menu { position: absolute; top: 100%; right: 0; margin-top: 4px; background: white; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); z-index: 50; min-width: 140px; display: none; }
+    .thread-label-menu.open { display: block; }
+
+    /* Notes */
+    #notesPanel { background: #fffde7; border-bottom: 1px solid #f0d060; padding: 10px 16px; display: none; }
+    #notesTextarea { width: 100%; min-height: 60px; border: none; background: transparent; resize: vertical; font-size: 13px; font-family: inherit; outline: none; }
+    .notes-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+    .notes-actions button { font-size: 12px; padding: 4px 12px; border-radius: 6px; border: none; cursor: pointer; }
+    #saveNotesBtn { background: var(--green); color: white; }
+    #cancelNotesBtn { background: #eee; }
+
+    /* System bubbles — הערות ומשימות */
+    .system-bubble { align-self: center; background: rgba(0,0,0,0.06); border-radius: 12px; padding: 6px 16px; font-size: 12px; color: #555; max-width: 80%; text-align: center; position: relative; }
+    .system-bubble.task { background: #fff8e1; border: 1px solid #ffe082; }
+    .system-bubble.task.done { background: #f1f8e9; border-color: #aed581; color: #888; }
+    .system-bubble-meta { font-size: 10px; color: #999; margin-top: 3px; }
+    .system-bubble-actions { font-size: 11px; margin-top: 5px; display: flex; justify-content: center; gap: 10px; }
+    .system-bubble-actions button { background: none; border: none; cursor: pointer; color: #888; font-size: 11px; padding: 0; }
+    .system-bubble-actions button:hover { color: #333; }
+
+    /* Note add bar */
+    .note-add-bar { background: #f0f2f5; border-top: 1px solid var(--border); padding: 8px 16px; display: flex; gap: 8px; align-items: center; }
+    .note-add-bar input { flex: 1; padding: 6px 12px; border-radius: 16px; border: 1px solid var(--border); font-size: 13px; outline: none; }
+    .note-add-bar select { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); font-size: 12px; outline: none; background: white; }
+    .note-add-bar button { background: var(--dark); color: white; border: none; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 12px; }
+
+    /* Messages */
+    .message-area { flex: 1; padding: 16px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+    .msg-bubble { max-width: 68%; padding: 9px 14px; border-radius: 8px; font-size: 14px; box-shadow: 0 1px 1px rgba(0,0,0,0.08); position: relative; }
+    .msg-bubble.incoming { background: white; align-self: flex-start; border-top-right-radius: 0; }
+    .msg-bubble.outgoing { align-self: flex-end; border-top-left-radius: 0; }
+    .msg-meta { font-size: 11px; color: var(--text-secondary); margin-top: 4px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .msg-label-chip { font-size: 10px; padding: 1px 6px; border-radius: 8px; color: white; cursor: pointer; white-space: nowrap; }
+    .msg-subject { font-size: 11px; font-weight: 600; color: #555; margin-bottom: 4px; }
+    .msg-deleted-header { font-weight: bold; font-size: 12px; color: #e74c3c; margin-bottom: 4px; padding: 3px 0; border-bottom: 1px solid #fde8e8; }
+
+    /* Msg label dropdown */
+    .label-menu { position: absolute; background: white; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); z-index: 50; min-width: 140px; right: 0; margin-top: 4px; display: none; }
+    .label-menu.open { display: block; }
+    .label-menu-item { padding: 8px 14px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+    .label-menu-item:hover { background: #f5f5f5; }
+    .label-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Delete dialog */
+    .delete-dialog { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 300; }
+    .delete-dialog-box { background: white; border-radius: 12px; padding: 24px; width: 320px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+    .delete-dialog-box h3 { margin-bottom: 16px; font-size: 15px; color: var(--dark); }
+    .delete-dialog-box button { width: 100%; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: bold; margin-bottom: 8px; }
+    .btn-delete-soft { background: #f0f2f5; color: #444; }
+    .btn-delete-gmail { background: #e74c3c; color: white; }
+    .btn-delete-cancel { background: none; color: var(--text-secondary); font-weight: normal; }
+
+    /* History btn */
+    .btn-history { background: #f0f2f5; border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; cursor: pointer; font-size: 12px; color: #444; width: calc(100% - 24px); margin: 8px 12px; }
+    .btn-history:hover { background: #e9edef; }
+
+    /* Reply */
+    .reply-footer { background: #f0f2f5; padding: 10px 16px; display: flex; gap: 10px; align-items: flex-end; }
+    #replyText { flex: 1; min-height: 42px; max-height: 120px; border-radius: 20px; border: none; padding: 10px 18px; resize: none; font-size: 14px; font-family: inherit; outline: none; line-height: 1.4; }
+    #sendBtn { background: var(--green); color: white; border: none; padding: 0 22px; height: 42px; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 14px; white-space: nowrap; }
+    #sendBtn:hover { background: #008f72; }
+    #sendBtn:disabled { background: #aaa; cursor: default; }
+
+    .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); gap: 12px; }
+    .empty-state .icon { font-size: 48px; }
+
+    #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 400; }
+    #toast.show { opacity: 1; }
+    .loading { text-align: center; padding: 40px; color: var(--text-secondary); }
+  </style>
+  <!-- OneSignal Push Notifications SDK -->
+  <script src="https://onesignal.com" defer></script>
+</head>
+<body>
+
+<!-- Login -->
+<div id="loginOverlay">
+  <div id="loginBox">
+    <h2>👋 שלום!</h2>
+    <p>מי נכנס עכשיו?</p>
+    <select id="managerSelect"><option value="">— בחר —</option></select>
+    <button id="loginBtn" onclick="login()">כניסה</button>
+  </div>
+</div>
+
+<!-- New Email Modal -->
+<div id="newEmailModal" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <h3>✉️ הודעה חדשה</h3>
+    <div class="modal-field">
+      <label>אל (מייל)</label>
+      <input type="text" id="newTo" placeholder="הקלד מייל או שם..." oninput="autocompleteContact(this.value)" autocomplete="off">
+      <div class="autocomplete-list" id="autocompleteList"></div>
+    </div>
+    <div class="modal-field">
+      <label>נושא</label>
+      <input type="text" id="newSubject" placeholder="נושא ההודעה">
+    </div>
+    <div class="modal-field">
+      <label>גוף ההודעה</label>
+      <textarea id="newBody" placeholder="תוכן ההודעה..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeNewEmail()">ביטול</button>
+      <button class="btn-send" id="newSendBtn" onclick="sendNewEmail()">שלח </button>
+    </div>
+  </div>
+</div>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-header">
+    <div>
+      <h2>📬 Mizam CRM</h2>
+      <div class="sidebar-meta" id="sidebarMeta"></div>
+    </div>
+    <div class="sidebar-header-btns">
+      <button class="hdr-btn" onclick="openNewEmail()">✏️ חדש</button>
+      <button class="hdr-btn" onclick="reloadData()" title="רענן">🔄</button>
+    </div>
+  </div>
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="🔍 חיפוש..." oninput="filterList(this.value)">
+  </div>
+  <div class="chat-list" id="chatList"><div class="loading">⏳ טוען...</div></div>
+  <div id="historyBtnWrap" style="display:none">
+    <button class="btn-history" onclick="toggleHistory()">🗂️ שרשורים מחוקים</button>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main" id="mainArea">
+  <div class="empty-state">
+    <div class="icon">💬</div>
+    <div>בחר שיחה מהרשימה</div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  var SUPER_MANAGER_NAME = "<?= SUPER_MANAGER ?>";
+  var crmData = { contacts:[], messages:[], threads:[], managers:[], labels:[], notes:[] };
+  var activeThreadId = null;
+  var currentManager = null;
+  var showingHistory = false;
+
+  // ── Login ──
+  function login() {
+    var sel = document.getElementById('managerSelect');
+    var val = sel.value;
+    if (!val) return;
+    sessionStorage.setItem('mizamManager', val);
+    currentManager = JSON.parse(val);
+    document.getElementById('loginOverlay').style.display = 'none';
+    document.getElementById('sidebarMeta').textContent = 'מחובר: ' + currentManager.displayName;
+    if (SUPER_MANAGER_NAME && currentManager.displayName === SUPER_MANAGER_NAME) {
+      document.getElementById('historyBtnWrap').style.display = 'block';
+    }
+    loadData();
+  }
+
+  function checkSession() {
+    var stored = sessionStorage.getItem('mizamManager');
+    if (stored) {
+      currentManager = JSON.parse(stored);
+      document.getElementById('loginOverlay').style.display = 'none';
+      document.getElementById('sidebarMeta').textContent = 'מחובר: ' + currentManager.displayName;
+      if (SUPER_MANAGER_NAME && currentManager.displayName === SUPER_MANAGER_NAME) {
+        document.getElementById('historyBtnWrap').style.display = 'block';
+      }
+    }
+  }
+
+  // ── Data ──
+  function loadData() {
+    var mgrName = currentManager ? currentManager.displayName : '';
+    google.script.run
+      .withSuccessHandler(function(raw) {
+        crmData = JSON.parse(raw);
+        populateManagerSelect();
+        renderSidebar();
+        if (activeThreadId) openThread(activeThreadId);
+      })
+      .withFailureHandler(function(err) { showToast('שגיאה בטעינה: ' + err.message); })
+      .loadCrmData(mgrName);
+  }
+
+  function reloadData() { loadData(); showToast('מרענן...'); }
+
+  function populateManagerSelect() {
+    var sel = document.getElementById('managerSelect');
+    var current = sel.value;
+    sel.innerHTML = '<option value="">— בחר —</option>';
+    crmData.managers.forEach(function(m) {
+      var obj = { displayName: m[0], color: m[1] };
+      var opt = document.createElement('option');
+      opt.value = JSON.stringify(obj);
+      opt.textContent = m[0];
+      sel.appendChild(opt);
+    });
+    if (current) sel.value = current;
+  }
+
+  // ── Sidebar ──
+  function renderSidebar(filter) {
+    var list = document.getElementById('chatList');
+    list.innerHTML = '';
+    var threads = crmData.threads.slice().sort(function(a,b){ return new Date(b[5]) - new Date(a[5]); });
+    var shown = 0;
+
+    threads.forEach(function(thread) {
+      var threadId = thread[0], subject = stripRe(thread[1] || '(ללא נושא)'), email = thread[2], label = thread[3], lastAct = thread[5], deletedBy = thread[6] || '';
+
+      if (deletedBy && !showingHistory) return;
+      if (!deletedBy && showingHistory) return;
+
+      var contact = crmData.contacts.find(function(c){ return c[0]===email; });
+      var name    = contact ? contact[1] : email;
+      if (filter && !name.includes(filter) && !subject.includes(filter) && !email.includes(filter)) return;
+
+      var msgs   = crmData.messages.filter(function(m){ return m[1]===threadId; });
+      var unread = msgs.some(function(m){ return m[5]==='חדש'; });
+      var preview = msgs.length ? String(msgs[msgs.length-1][10] || '').substring(0,50) : '';
+      var li     = crmData.labels.find(function(l){ return l[0]===label; });
+      var lc     = li ? li[1] : '#aaa';
+
+      var item = document.createElement('div');
+      item.className = 'chat-item' + (unread?' unread':'') + (threadId===activeThreadId?' active':'');
+
+      // כפתורי ריחוף — נקרא + מחיקה + ביטול מחיקה
+      var actionBtns = '';
+      if (!deletedBy) {
+        actionBtns +=
+          '<button class="action-btn" onclick="toggleReadThread(event,\''+threadId+'\')" title="'+(unread?'סמן כנקרא':'סמן כלא נקרא')+'">'+(unread?'✓':'●')+'</button>'+
+          '<button class="action-btn" onclick="openDeleteDialog(event,\''+threadId+'\',\'thread\')" title="מחק">🗑️</button>';
+      } else {
+        actionBtns +=
+          '<button class="action-btn" onclick="undeleteItem(event,\''+threadId+'\',\'thread\')" title="בטל מחיקה">↩️</button>';
+      }
+
+      item.innerHTML =
+        '<div class="avatar" style="background:'+stringToColor(email)+'">'+(name[0]||'?')+'</div>'+
+        '<div class="chat-item-info">'+
+          '<div class="chat-item-name">'+esc(name)+'</div>'+
+          '<div class="chat-item-preview">'+esc(subject)+'</div>'+
+        '</div>'+
+        '<div class="chat-item-right">'+
+          '<div class="chat-item-time">'+formatDate(lastAct)+'</div>'+
+          (label&&!deletedBy?'<span class="label-chip" style="background:'+lc+'">'+esc(label)+'</span>':'')+
+          (unread?'<div class="unread-badge">!</div>':'')+
+        '</div>'+
+        '<div class="chat-item-actions">'+actionBtns+'</div>';
+
+      item.onclick = function(e){
+        if (e.target.closest('.chat-item-actions')) return;
+        openThread(threadId);
+      };
+      list.appendChild(item);
+      shown++;
+    });
+
+    if (!shown) list.innerHTML = '<div class="loading">אין שיחות</div>';
+  }
+
+  function filterList(val){ renderSidebar(val.trim()); }
+
+  // ── Toggle read ──
+  function toggleReadThread(e, threadId) {
+    e.stopPropagation();
+    var msgs  = crmData.messages.filter(function(m){ return m[1]===threadId; });
+    var unread = msgs.some(function(m){ return m[5]==='חדש'; });
+    var newStatus = unread ? 'נקרא' : 'חדש';
+    var managerName = currentManager ? currentManager.displayName : '';
+    var done = 0;
+    if (!msgs.length) return;
+
+    msgs.forEach(function(msg) {
+      google.script.run
+        .withSuccessHandler(function(){
+          done++;
+          if (done === msgs.length) {
+            // נקה תווית שרשור אם סומן כנקרא
+            if (newStatus === 'נקרא') {
+              google.script.run
+                .withSuccessHandler(function(){ loadData(); })
+                .updateThreadLabel(threadId, '', managerName);
+            } else {
+              loadData();
+            }
+          }
+        })
+        .updateMessageStatus(msg[0], newStatus, managerName);
+    });
+  }
+
+  // ── Delete dialog ──
+function openDeleteDialog(e, id, type) {
+  e.stopPropagation();
+  var isSuperManager = currentManager && SUPER_MANAGER_NAME && (currentManager.displayName === SUPER_MANAGER_NAME);
+
+  if (isSuperManager) {
+    // אם זו את - מציגים את הדיאלוג עם כל האפשרויות
+    var overlay = document.createElement('div');
+    overlay.className = 'delete-dialog';
+    overlay.id = 'deleteDialog';
+    var label = type === 'thread' ? 'שרשור' : 'הודעה';
+    overlay.innerHTML =
+      '<div class="delete-dialog-box">'+
+        '<h3>מחיקת '+label+'</h3>'+
+        '<button class="btn-delete-soft" onclick="doDelete(\''+id+'\',\''+type+'\',false)">מחק מהמערכת בלבד</button>'+
+        '<button class="btn-delete-gmail" onclick="doDelete(\''+id+'\',\''+type+'\',true)">מחק מהמערכת ומהמייל</button>'+
+        '<button class="btn-delete-cancel" onclick="closeDeleteDialog()">ביטול</button>'+
+      '</div>';
+    document.body.appendChild(overlay);
+  } else {
+    // אם זה מנהל רגיל - אין דיאלוג בכלל. מפעילים מיד מחיקה רכה
+    doDelete(id, type, false);
+  }
+}
+
+  function closeDeleteDialog() {
+    var d = document.getElementById('deleteDialog');
+    if (d) d.remove();
+  }
+
+  function doDelete(id, type, fromGmail) {
+    closeDeleteDialog();
+    var managerName = currentManager ? currentManager.displayName : 'מנהל';
+    if (type === 'thread') {
+      google.script.run
+        .withSuccessHandler(function(){ showToast('השרשור נמחק ✅'); loadData(); })
+        .withFailureHandler(function(err){ showToast('שגיאה: '+err.message); })
+        .deleteThreadFromWeb(id, managerName, fromGmail);
+    } else {
+      google.script.run
+        .withSuccessHandler(function(){ showToast('ההודעה נמחקה ✅'); loadData(); })
+        .withFailureHandler(function(err){ showToast('שגיאה: '+err.message); })
+        .deleteMessageFromWeb(id, managerName, fromGmail);
+    }
+  }
+
+  function undeleteItem(e, id, type) {
+    e.stopPropagation();
+    if (type === 'thread') {
+      google.script.run
+        .withSuccessHandler(function(){ showToast('המחיקה בוטלה ✅'); loadData(); })
+        .undeleteThread(id);
+    } else {
+      google.script.run
+        .withSuccessHandler(function(){ showToast('המחיקה בוטלה ✅'); loadData(); })
+        .undeleteMessage(id);
+    }
+  }
+
+  // ── History ──
+  function toggleHistory() {
+    showingHistory = !showingHistory;
+    var btn = document.querySelector('#historyBtnWrap button');
+    btn.textContent = showingHistory ? '◀ חזור לרשימה' : '🗂️ שרשורים מחוקים';
+    renderSidebar(document.getElementById('searchInput').value);
+  }
+
+  // ── Thread ──
+  function openThread(threadId) {
+    activeThreadId = threadId;
+    document.querySelectorAll('.chat-item').forEach(function(el){ el.classList.remove('active'); });
+
+    var thread = crmData.threads.find(function(t){ return t[0]===threadId; });
+    if (!thread) return;
+
+    var email   = thread[2];
+    var contact = crmData.contacts.find(function(c){ return c[0]===email; });
+    var name    = contact ? contact[1] : email;
+    var label   = thread[3], notes = thread[4]||'';
+    var subject = stripRe(thread[1]||'(ללא נושא)');
+    var li      = crmData.labels.find(function(l){ return l[0]===label; });
+    var lc      = li ? li[1] : '#aaa';
+
+    var msgs = crmData.messages
+      .filter(function(m){ return m[1]===threadId; })
+      .sort(function(a,b){ return new Date(a[8])-new Date(b[8]); });
+
+    var main = document.getElementById('mainArea');
+    main.innerHTML =
+      '<div class="chat-header">'+
+        '<div class="avatar" style="background:'+stringToColor(email)+';width:38px;height:38px;font-size:16px">'+(name[0]||'?')+'</div>'+
+        '<div class="header-info">'+
+          '<div class="header-name">'+esc(name)+' <span style="font-weight:normal;font-size:13px;color:#888">('+esc(email)+')</span></div>'+
+          '<div class="header-sub">'+
+            '<span id="displaySubject" title="לחץ לעריכת נושא" onclick="editSubject(\''+threadId+'\')">'+esc(subject)+'</span>'+
+            (label?' &nbsp;<span class="label-chip" style="background:'+lc+'">'+esc(label)+'</span>':'')+
+          '</div>'+
+        '</div>'+
+        '<div class="header-actions">'+
+          //'<button class="icon-btn" onclick="toggleNotes()">📝 הערות</button>'+
+          '<div class="thread-label-wrap">'+
+            '<button class="icon-btn" onclick="toggleThreadLabelMenu(event)">🏷️ תווית</button>'+
+            '<div class="thread-label-menu" id="threadLabelMenu">'+buildThreadLabelMenuItems(threadId)+'</div>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      '<div id="notesPanel">'+
+       // '<textarea id="notesTextarea" placeholder="הערות פנימיות...">'+esc(notes)+'</textarea>'+
+       // '<div class="notes-actions">'+
+      //  '<button id="cancelNotesBtn" onclick="toggleNotes()">ביטול</button>'+
+      //    '<button id="saveNotesBtn" onclick="saveNotes(\''+threadId+'\')">שמור</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="message-area" id="msgArea"></div>'+
+      // העטיפה הראשית של אזור ההקלדה
+      '<div class="chat-bottom-wrapper" style="display: flex; flex-direction: column;">'+
+        
+        // 1. שורת ההערות - מוסתרת כברירת מחדל (display:none)
+        '<div class="note-add-bar" id="noteAddBar" style="display:none; padding: 10px; background: white; border-bottom: 1px solid #ddd; gap: 8px;">'+
+          '<input type="text" id="noteInput" placeholder="הוסף הערה או משימה..." style="flex:1; padding: 6px; border-radius: 4px; border: 1px solid #ccc;">'+
+          '<select id="noteType" style="padding: 6px; border-radius: 4px; border: 1px solid #ccc;">'+
+            '<option value="note">📝 הערה</option>'+
+            '<option value="task">✅ משימה</option>'+
+          '</select>'+
+          '<select id="noteTarget" style="padding: 6px; border-radius: 4px; border: 1px solid #ccc;">'+
+            '<option value="">לכולם</option>'+
+            buildManagerOptions()+
+          '</select>'+
+          '<button onclick="submitNote(\''+threadId+'\')" style="padding: 6px 12px; border-radius: 4px;">הוסף</button>'+
+        '</div>'+
+        
+        // 2. שורת ההקלדה בסגנון וואטסאפ (תמיד גלויה)
+        '<div class="reply-footer" style="display: flex; align-items: center; gap: 10px; padding: 10px; background: #f0f2f5;">'+
+          
+          // כפתור פלוס לפתיחת/סגירת שורת ההערות
+          '<button onclick="toggleNoteBar()" title="הערות ומשימות" style="background:none; border:none; font-size:24px; cursor:pointer; padding:0; color:#54656f;font-weight:bold;">︿</button>'+
+          
+          // תיבת הטקסט המעוגלת
+          '<textarea id="replyText" placeholder="כתוב תשובה... (Enter לשליחה, Shift+Enter לשורה חדשה)" onkeydown="handleKey(event)" style="flex:1; border-radius:20px; padding:10px 14px; border:1px solid #ddd; resize:none; height:24px; outline:none; font-family:inherit; overflow:hidden;"></textarea>'+
+          
+          // כפתור השליחה עם חץ
+          '<button id="sendBtn" onclick="sendReply()" title="שלח" style="background:none; border:none; font-size:24px; cursor:pointer; padding:0; color:#00a884; transform: scaleX(-1);">➤</button>'+
+        
+        '</div>'+
+      '</div>';
+
+
+    var area = document.getElementById('msgArea');
+    var displaySubject = stripRe(thread[1]||'');
+
+    // מיזוג הודעות והערות לפי זמן
+    var allItems = [];
+    msgs.forEach(function(msg){ allItems.push({ time: new Date(msg[8]), type:'msg', data:msg }); });
+    (crmData.notes||[]).filter(function(n){ return n[1]===threadId; }).forEach(function(n){
+      allItems.push({ time: new Date(n[6]), type:'note', data:n });
+    });
+    allItems.sort(function(a,b){ return a.time - b.time; });
+
+    allItems.forEach(function(item){
+      if (item.type==='msg') {
+        area.appendChild(buildBubble(item.data, displaySubject));
+      } else {
+        var n = item.data;
+        var noteId=n[0], body=n[2], type=n[3], target=n[4], createdBy=n[5], createdAt=n[6], isDone=!!n[7];
+        var isOwner = currentManager && currentManager.displayName===createdBy;
+        var isTask  = type==='task';
+        var cls = 'system-bubble'+(isTask?' task':'')+(isTask&&isDone?' done':'');
+        var prefix = isDone ? '✅ ' : (isTask ? '☐ ' : '');
+        var targetLabel = target?' · לתשומת לב: '+target:'';
+        var div = document.createElement('div');
+        div.className = cls;
+        div.id = 'nb_'+noteId;
+        var actions = '';
+        if (isTask&&!isDone) actions += '<button onclick="markTaskDone(\''+noteId+'\')">סמן כבוצע</button>';
+        if (isOwner) {
+          actions += '<button onclick="startEditNote(\''+noteId+'\',\''+esc(body)+'\')">עריכה</button>';
+          actions += '<button onclick="removeNote(\''+noteId+'\')">מחיקה</button>';
+        }
+        div.innerHTML =
+          '<div>'+prefix+esc(body)+'</div>'+
+          '<div class="system-bubble-meta">'+esc(createdBy)+' · '+formatDateTime(createdAt)+esc(targetLabel)+'</div>'+
+          (actions?'<div class="system-bubble-actions">'+actions+'</div>':'');
+        area.appendChild(div);
+      }
+    });
+    area.scrollTop = area.scrollHeight;
+    document.addEventListener('click', closeAllMenus);
+  }
+
+ function buildBubble(msg, displaySubject) {
+    // הוספנו את שליפת ה-senderEmail (אינדקס 2)
+    var msgId = msg[0], senderEmail = msg[2], direction = msg[4], status = msg[5], handler = msg[6];
+    var date = msg[8], body = String(msg[10]||'');
+    var isOut = direction === 'Outgoing';
+    var deletedBy = msg[11] || '';
+
+    var mi = handler ? crmData.managers.find(function(m){ return m[0]===handler; }) : null;
+    var bubbleColor = isOut ? (mi ? mi[1] : '#25d366') : null;
+
+    var li = crmData.labels.find(function(l){ return l[0]===status; });
+    var lc = li ? li[1] : '#95a5a6';
+
+    // 1. הגדרת השם שיופיע ליד השעה: 
+    var displayName = "";
+    if (isOut) {
+      displayName = handler || "מנהל"; 
+    } else {
+      // אם זו הודעה נכנסת - מחפשים באנשי הקשר. אם לא נמצא, מציגים את המייל.
+      var contact = (crmData.contacts || []).find(function(c) { return c[0] === senderEmail; });
+      displayName = contact ? contact[1] : senderEmail;
+    }
+
+    var div = document.createElement('div');
+    div.className = 'msg-bubble ' + (isOut?'outgoing':'incoming');
+    if (isOut && bubbleColor) div.style.background = bubbleColor + '22';
+    if (deletedBy) div.style.opacity = '0.6';
+
+    var deleteBtn = '<button style="float:left;background:none;border:none;cursor:pointer;font-size:12px;color:#e74c3c;padding:0" '+
+      'onclick="openDeleteDialog(event,\''+msgId+'\',\'message\')" title="מחק הודעה">🗑️</button>';
+    var undeleteBtn = deletedBy ? '<button style="float:left;background:none;border:none;cursor:pointer;font-size:12px;color:#27ae60;padding:0" '+
+      'onclick="undeleteItem(event,\''+msgId+'\',\'message\')" title="בטל מחיקה">↩️</button>' : '';
+
+    div.innerHTML =
+      (deletedBy?'<div class="msg-deleted-header">🗑️ נמחק ע"י '+esc(deletedBy)+'</div>':'')+
+      deleteBtn + undeleteBtn +
+      (displaySubject?'<div class="msg-subject">'+esc(displaySubject)+'</div>':'')+
+      '<div style="white-space:pre-wrap;word-break:break-word">'+esc(body)+'</div>'+
+      '<div class="msg-meta">'+
+        // שינוי כאן: שימוש ב-displayName במקום ב-handler
+        '<span>'+formatDateTime(date)+(displayName ? ' · ' + esc(displayName) : '')+'</span>'+
+        // שורת הסטטוס נשארה בדיוק כמו במקור
+        '<span class="msg-label-chip" style="background:'+lc+'" onclick="toggleMsgLabelMenu(event,\''+msgId+'\')">'+esc(status||'חדש')+'</span>'+
+      '</div>'+
+      '<div class="label-menu" id="lm_'+msgId+'">'+buildLabelMenuItems(msgId)+'</div>';
+
+    return div;
+  }
+
+  function buildLabelMenuItems(msgId) {
+    return crmData.labels.map(function(l){
+      return '<div class="label-menu-item" onclick="setMsgLabel(\''+msgId+'\',\''+l[0]+'\')">'+
+        '<div class="label-dot" style="background:'+l[1]+'"></div>'+esc(l[0])+'</div>';
+    }).join('');
+  }
+
+  function buildThreadLabelMenuItems(threadId) {
+    return crmData.labels.map(function(l){
+      return '<div class="label-menu-item" onclick="setThreadLabel(\''+threadId+'\',\''+l[0]+'\')">'+
+        '<div class="label-dot" style="background:'+l[1]+'"></div>'+esc(l[0])+'</div>';
+    }).join('');
+  }
+
+  function toggleMsgLabelMenu(e, msgId) {
+    e.stopPropagation();
+    var menu = document.getElementById('lm_'+msgId);
+    if (!menu) return;
+    var isOpen = menu.classList.contains('open');
+    closeAllMenus();
+    if (!isOpen) menu.classList.add('open');
+  }
+
+  function toggleThreadLabelMenu(e) {
+    e.stopPropagation();
+    var menu = document.getElementById('threadLabelMenu');
+    if (!menu) return;
+    var isOpen = menu.classList.contains('open');
+    closeAllMenus();
+    if (!isOpen) menu.classList.add('open');
+  }
+
+  function closeAllMenus() {
+    document.querySelectorAll('.label-menu.open, .thread-label-menu.open').forEach(function(m){ m.classList.remove('open'); });
+  }
+
+  function setMsgLabel(msgId, label) {
+    closeAllMenus();
+    google.script.run
+      .withSuccessHandler(function(){ showToast('תווית עודכנה ✅'); loadData(); })
+      .withFailureHandler(function(e){ showToast('שגיאה: '+e.message); })
+      .updateMessageStatus(msgId, label, currentManager?currentManager.displayName:'');
+  }
+
+  function setThreadLabel(threadId, label) {
+    closeAllMenus();
+    google.script.run
+      .withSuccessHandler(function(){ showToast('תווית עודכנה ✅'); loadData(); })
+      .withFailureHandler(function(e){ showToast('שגיאה: '+e.message); })
+      .updateThreadLabel(threadId, label, currentManager?currentManager.displayName:'');
+  }
+
+  // ── Subject edit ──
+  function editSubject(threadId) {
+    var el = document.getElementById('displaySubject');
+    var cur = el.textContent;
+    var input = document.createElement('input');
+    input.value = cur;
+    input.style.cssText = 'font-size:14px;border:none;border-bottom:2px solid var(--green);outline:none;width:220px;';
+    el.replaceWith(input);
+    input.focus();
+    input.onblur = function(){ saveSubject(threadId, input.value); };
+    input.onkeydown = function(e){ if(e.key==='Enter') input.blur(); if(e.key==='Escape'){input.value=cur;input.blur();} };
+  }
+
+  function saveSubject(threadId, newVal) {
+    google.script.run
+      .withSuccessHandler(function(){ showToast('נושא עודכן ✅'); loadData(); })
+      .withFailureHandler(function(e){ showToast('שגיאה: '+e.message); })
+      .updateThreadDisplaySubject(threadId, newVal);
+  }
+
+  // ── Notes ──
+  function toggleNoteBar() {
+    var bar = document.getElementById('noteAddBar');
+    if (!bar) return; // מוודא שהאזור קיים כדי למנוע שגיאות
+    
+    // אם הפאנל מוסתר - נפתח אותו כ-flex (כדי שהאלמנטים בפנים יסתדרו יפה), אחרת נסתיר אותו
+    if (bar.style.display === 'none' || bar.style.display === '') {
+      bar.style.display = 'flex';
+    } else {
+      bar.style.display = 'none';
+    }
+  }
+
+  function buildManagerOptions() {
+    return crmData.managers.map(function(m){
+      return '<option value="'+esc(m[0])+'">'+esc(m[0])+'</option>';
+    }).join('');
+  }
+
+  function submitNote(threadId) {
+    var body   = document.getElementById('noteInput').value.trim();
+    var type   = document.getElementById('noteType').value;
+    var target = document.getElementById('noteTarget').value;
+    if (!body) return;
+    var createdBy = currentManager ? currentManager.displayName : 'מנהל';
+    google.script.run
+      .withSuccessHandler(function(){
+        document.getElementById('noteInput').value = '';
+        showToast('הערה נוספה ✅');
+        loadData();
+      })
+      .withFailureHandler(function(e){ showToast('שגיאה: '+e.message); })
+      .addNote(threadId, body, type, target, createdBy);
+  }
+
+  function markTaskDone(noteId) {
+    google.script.run
+      .withSuccessHandler(function(){ showToast('משימה הושלמה ✅'); loadData(); })
+      .withFailureHandler(function(e){ showToast('שגיאה: '+e.message); })
+      .completeTask(noteId);
+  }
+
+  function startEditNote(noteId, currentBody) {
+    var newBody = prompt('עריכת הערה:', currentBody);
+    if (!newBody || newBody===currentBody) return;
+    google.script.run
+      .withSuccessHandler(function(ok){
+        if (ok) { showToast('הערה עודכנה ✅'); loadData(); }
+        else showToast('לא ניתן לערוך — רק הכותב יכול לערוך');
+      })
+      .withFailureHandler(function(e){ showToast('שגיאה: '+e.message); })
+      .editNote(noteId, newBody, currentManager?currentManager.displayName:'');
+  }
+
+  function removeNote(noteId) {
+    if (!confirm('למחוק הערה זו?')) return;
+    google.script.run
+      .withSuccessHandler(function(ok){
+        if (ok) { showToast('הערה נמחקה ✅'); loadData(); }
+        else showToast('לא ניתן למחוק — רק הכותב יכול למחוק');
+      })
+      .withFailureHandler(function(e){ showToast('שגיאה: '+e.message); })
+      .deleteNote(noteId, currentManager?currentManager.displayName:'');
+  }
+
+  // ── Reply ──
+  function handleKey(e) {
+    if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendReply(); }
+  }
+
+  function sendReply() {
+    var text = document.getElementById('replyText').value.trim();
+    if (!text || !activeThreadId) return;
+    
+    var btn = document.getElementById('sendBtn');
+    
+    // נועל את הכפתור, שומר על האייקון, ומשנה את הצבע לאפור עדין
+    btn.disabled = true; 
+    btn.style.color = '#cccccc'; 
+    btn.style.cursor = 'not-allowed'; // משנה את סמן העכבר
+    
+    // מקפיץ הודעת "שולח..." יפה על המסך במקום להרוס את הכפתור
+    showToast('שולח'); 
+
+    google.script.run
+      .withSuccessHandler(function(){
+        document.getElementById('replyText').value = '';
+        
+        // מחזיר את הכפתור לחיים ולצבע הירוק שלו
+        btn.disabled = false; 
+        btn.style.color = '#00a884'; 
+        btn.style.cursor = 'pointer';
+        
+        showToast('המענה נשלח! ');
+        loadData();
+      })
+      .withFailureHandler(function(err){
+        // במקרה של שגיאה - משחרר את הכפתור חזרה
+        btn.disabled = false; 
+        btn.style.color = '#00a884'; 
+        btn.style.cursor = 'pointer';
+        
+        showToast('❌ שגיאה: '+err.message);
+      })
+      .sendCrmReplyFromWeb(activeThreadId, text, currentManager?currentManager.displayName:'מנהל');
+  }
+  // ── New Email ──
+  function openNewEmail() {
+    document.getElementById('newTo').value = '';
+    document.getElementById('newSubject').value = '';
+    document.getElementById('newBody').value = '';
+    document.getElementById('autocompleteList').style.display = 'none';
+    document.getElementById('newEmailModal').style.display = 'flex';
+  }
+
+  function closeNewEmail() {
+    document.getElementById('newEmailModal').style.display = 'none';
+  }
+
+  function autocompleteContact(val) {
+    var list = document.getElementById('autocompleteList');
+    if (!val || val.length < 2) { list.style.display='none'; return; }
+    var matches = crmData.contacts.filter(function(c){
+      return c[0].toLowerCase().includes(val.toLowerCase()) || c[1].toLowerCase().includes(val.toLowerCase());
+    }).slice(0,6);
+    if (!matches.length) { list.style.display='none'; return; }
+    list.innerHTML = matches.map(function(c){
+      return '<div class="autocomplete-item" onclick="selectContact(\''+esc(c[0])+'\',\''+esc(c[1])+'\')">'+
+        esc(c[1])+' <span style="color:#888;font-size:11px">'+esc(c[0])+'</span></div>';
+    }).join('');
+    list.style.display = 'block';
+  }
+
+  function selectContact(email, name) {
+    document.getElementById('newTo').value = email;
+    document.getElementById('autocompleteList').style.display = 'none';
+  }
+
+  function sendNewEmail() {
+    var to      = document.getElementById('newTo').value.trim();
+    var subject = document.getElementById('newSubject').value.trim();
+    var body    = document.getElementById('newBody').value.trim();
+    if (!to || !subject || !body) { showToast('נא למלא את כל השדות'); return; }
+    var btn = document.getElementById('newSendBtn');
+    btn.disabled = true; btn.textContent = 'שולח...';
+    google.script.run
+      .withSuccessHandler(function(newThreadId){
+        btn.disabled = false; btn.textContent = 'שלח ';
+        closeNewEmail();
+        showToast(' המייל נשלח בהצלחה!');
+        loadData();
+        if (newThreadId) setTimeout(function(){ openThread(newThreadId); }, 1500);
+      })
+      .withFailureHandler(function(err){
+        btn.disabled = false; btn.textContent = 'שלח ';
+        showToast('❌ שגיאה: '+err.message);
+      })
+      .sendNewEmailFromWeb(to, subject, body, currentManager?currentManager.displayName:'מנהל');
+  }
+
+  // ── Utils ──
+function stripRe(subject) {
+  // 1. קודם כל ממירים לטקסט בצורה בטוחה (כדי לא לקרוס על מספרים כמו "1234")
+  var safeSubject = String(subject || "").trim();
+  // 2. מנקים את הקידומות
+  var cleaned = safeSubject.replace(/^(re|fwd|fw|השב)\s*:\s*/gi, '').trim();
+  
+  // 3. אם אחרי הניקוי לא נשאר כלום (או שמהתחלה היה ריק) - מחזירים ללא נושא
+  if (cleaned === "") {
+    return "(ללא נושא)";
+  }
+  // 4. אם הכל תקין ונשאר טקסט אמיתי, מחזירים אותו
+  return cleaned;
+}
+  
+
+  function esc(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function formatDate(d) {
+    if (!d) return '';
+    var dt = new Date(d), now = new Date();
+    if (dt.toDateString()===now.toDateString()) return dt.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+    return dt.toLocaleDateString('he-IL',{day:'numeric',month:'numeric'});
+  }
+
+  function formatDateTime(d) {
+    if (!d) return '';
+    var dt = new Date(d);
+    return dt.toLocaleDateString('he-IL',{day:'numeric',month:'numeric'})+' '+dt.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+  }
+
+  function stringToColor(str) {
+    if (!str) return '#888';
+    var hash = 0;
+    for (var i=0;i<str.length;i++) hash = str.charCodeAt(i)+((hash<<5)-hash);
+    return 'hsl('+(Math.abs(hash)%360)+',50%,40%)';
+  }
+
+  function showToast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 3000);
+  }
+
+  // ── Init ──
+window.onload = function() {
+  checkSession();
+  
+  // ==========================================
+  // אתחול מערכת ההתראות המיידיות המעודכן (OneSignal)
+  // ==========================================
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  window.OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "<?= ONESIGNAL_APP_ID ?>",
+      safari_web_id: "<?= ONESIGNAL_SAFARI_ID ?>",
+      notifyButton: {
+        enable: false // מכבה את כפתור הפעמון הצף
+      }
+    });
+
+    // הכרחת רישום של המחשב לצינור ההתראות
+    if (Notification.permission === "granted") {
+      OneSignal.User.PushSubscription.optIn();
+      console.log("Mizam CRM: המחשב מאושר ומאזין להתראות");
+    } else {
+      OneSignal.showNativePrompt();
+    }
+  });
+  // ==========================================
+
+  var mgrName = currentManager ? currentManager.displayName : '';  
+  
+  google.script.run  
+    .withSuccessHandler(function(raw) {
+      crmData = JSON.parse(raw);
+      populateManagerSelect();
+      if (currentManager) renderSidebar();
+    })
+    .withFailureHandler(function(err){ 
+      showToast('שגיאה: '+err.message); 
+    })
+    .loadCrmData(mgrName);
+};
+
+
+</script>
+</body>
+</html>
