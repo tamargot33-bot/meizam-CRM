@@ -1,5 +1,7 @@
 # קבצים שלא יידחפו ל-Google Apps Script בעת clasp push
 backup/**
+local_docs/**
+*.md
 *.bak
 *.example.*
 .git/**

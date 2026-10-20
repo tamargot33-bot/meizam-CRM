@@ -11,5 +11,6 @@ desktop.ini
 *.log
 *.bak
 backup/
+local_docs/
 
 
